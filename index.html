@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>六角形ボタンパズル</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-top: 20px;
+        padding-bottom: 50px;
+      }
+      .puzzle-section {
+        margin-bottom: 10px;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background-color: #fff;
+        width: 90%;
+        max-width: 600px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .puzzle-section h2 {
+        margin-top: 0;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+      }
+      .controls {
+        margin: 20px 0;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        justify-content: center;
+      }
+      .hexagon-container {
+        position: relative;
+        width: 250px;
+        height: 220px;
+        margin: 30px auto; /* 上下マージン少し減らす */
+      }
+      .game-button,
+      .sim-button {
+        /* 共通スタイル */
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        border: 2px solid #333;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 1.2em;
+        font-weight: bold;
+        cursor: pointer;
+        position: absolute;
+        transition: background-color 0.3s;
+        user-select: none;
+        transform: translate(-50%, -50%);
+      }
+
+      /* 配置 (メイン盤面・検証盤面共通) - 各ボタンのIDに紐づく形で適用される */
+      [id$="ButtonA"] {
+        top: 30px;
+        left: 80px;
+      }
+      [id$="ButtonB"] {
+        top: 30px;
+        left: 170px;
+      }
+      [id$="ButtonF"] {
+        top: 110px;
+        left: 30px;
+      }
+      [id$="ButtonC"] {
+        top: 110px;
+        left: 220px;
+      }
+      [id$="ButtonE"] {
+        top: 190px;
+        left: 80px;
+      }
+      [id$="ButtonD"] {
+        top: 190px;
+        left: 170px;
+      }
+
+      .color-red {
+        background-color: #ff6b6b;
+        color: white;
+      }
+      .color-blue {
+        background-color: #4ecdc4;
+        color: white;
+      }
+      .color-yellow {
+        background-color: #ffffb5;
+        color: #333;
+      }
+
+      #calculateButton,
+      #resetSimulationBoardButton {
+        padding: 10px 20px;
+        font-size: 1em;
+        cursor: pointer;
+        color: white;
+        border: none;
+        border-radius: 5px;
+      }
+      #calculateButton {
+        background-color: #5cb85c;
+      }
+      #resetSimulationBoardButton {
+        background-color: #f0ad4e;
+      }
+
+      #result {
+        margin-top: 10px; /* 少し調整 */
+        font-size: 1.1em;
+        min-height: 30px; /* 少し調整 */
+        text-align: center;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="puzzle-section">
+      <p>
+        各ボタンをタップして初期盤面の色を設定してください。<br />その後、揃えたい色の数を選択し、「計算する」ボタンを押してください。
+      </p>
+      <div class="hexagon-container" id="mainHexagonContainer">
+        <div id="mainButtonA" class="game-button" data-index="0">A</div>
+        <div id="mainButtonB" class="game-button" data-index="1">B</div>
+        <div id="mainButtonC" class="game-button" data-index="2">C</div>
+        <div id="mainButtonD" class="game-button" data-index="3">D</div>
+        <div id="mainButtonE" class="game-button" data-index="4">E</div>
+        <div id="mainButtonF" class="game-button" data-index="5">F</div>
+      </div>
+      <div class="controls">
+        <label for="targetCount">揃えたい色の数:</label>
+        <select id="targetCount">
+          <option value="4">4</option>
+          <option value="5" selected>5</option>
+          <option value="6">6</option>
+        </select>
+        <button id="calculateButton">計算する</button>
+      </div>
+      <div id="result">タップ、または計算ボタンを押してください。</div>
+    </div>
+
+    <hr style="width: 80%; margin: 20px auto" />
+
+    <div class="puzzle-section">
+      <h2>検証用</h2>
+      <p>
+        「計算する」を押すと、上のメインパズルの初期盤面がここにコピーされます。<br />
+        その後、メインパズルの結果に表示された手順に従って、下のボタンを押して結果が合うか確認してください。
+      </p>
+      <div class="hexagon-container" id="simulationHexagonContainer">
+        <div id="simButtonA" class="sim-button" data-index="0">A</div>
+        <div id="simButtonB" class="sim-button" data-index="1">B</div>
+        <div id="simButtonC" class="sim-button" data-index="2">C</div>
+        <div id="simButtonD" class="sim-button" data-index="3">D</div>
+        <div id="simButtonE" class="sim-button" data-index="4">E</div>
+        <div id="simButtonF" class="sim-button" data-index="5">F</div>
+      </div>
+      <div class="controls">
+        <button id="resetSimulationBoardButton">↩️ 検証盤面をリセット</button>
+      </div>
+    </div>
+
+    <script>
+      const colors = ["red", "blue", "yellow"];
+      const colorClasses = ["color-red", "color-blue", "color-yellow"];
+      const buttonIds = ["A", "B", "C", "D", "E", "F"];
+
+      // メイン盤面用
+      let mainBoardColors = [0, 0, 0, 0, 0, 0];
+      const mainButtonElements = [];
+      let initialBoardForSimulation = [...mainBoardColors]; // 計算開始時のメイン盤面を保持
+
+      // 検証用盤面用
+      let simulationBoardColors = [0, 0, 0, 0, 0, 0];
+      const simulationButtonElements = [];
+
+      // DOM要素
+      const resultDiv = document.getElementById("result");
+      const targetCountSelect = document.getElementById("targetCount");
+      const calculateButton = document.getElementById("calculateButton");
+      const resetSimulationBoardButton = document.getElementById(
+        "resetSimulationBoardButton"
+      );
+
+      // --- 共通ロジック ---
+      function applyMoveLogic(boardState, buttonToPressIndex) {
+        // applyMove から改名
+        const newBoard = [...boardState];
+        const numButtons = 6;
+        const leftNeighborIndex =
+          (buttonToPressIndex - 1 + numButtons) % numButtons;
+        const rightNeighborIndex = (buttonToPressIndex + 1) % numButtons;
+        newBoard[leftNeighborIndex] =
+          (newBoard[leftNeighborIndex] + 1) % colors.length;
+        newBoard[rightNeighborIndex] =
+          (newBoard[rightNeighborIndex] + 1) % colors.length;
+        return newBoard;
+      }
+      function checkWinCondition(boardState, targetSameColorCount) {
+        const colorCounts = [0, 0, 0];
+        for (const colorIndex of boardState) {
+          colorCounts[colorIndex]++;
+        }
+        return colorCounts.some((count) => count >= targetSameColorCount);
+      }
+
+      // --- メイン盤面処理 ---
+      function initializeMainBoard() {
+        buttonIds.forEach((id, index) => {
+          const button = document.getElementById(`mainButton${id}`);
+          mainButtonElements.push(button);
+          updateMainButtonAppearance(index);
+
+          button.addEventListener("click", () => {
+            // 初期盤面設定用クリック
+            mainBoardColors[index] =
+              (mainBoardColors[index] + 1) % colors.length;
+            updateMainButtonAppearance(index);
+
+            resultDiv.textContent =
+              "メイン盤面の色を変更。準備ができたら「計算する」を押してください。";
+          });
+        });
+      }
+      function updateMainButtonAppearance(buttonIndex) {
+        const button = mainButtonElements[buttonIndex];
+        if (!button) return;
+        const colorIndex = mainBoardColors[buttonIndex];
+        button.className = "game-button"; // ClassListを使わずに基本クラスをリセット
+        button.classList.add(colorClasses[colorIndex]);
+      }
+      function updateAllMainButtonAppearances() {
+        for (let i = 0; i < mainBoardColors.length; i++) {
+          updateMainButtonAppearance(i);
+        }
+      }
+
+      // --- 検証用盤面処理 ---
+      function initializeSimulationBoard() {
+        buttonIds.forEach((id, index) => {
+          const button = document.getElementById(`simButton${id}`);
+          simulationButtonElements.push(button);
+          updateSimButtonAppearance(index); // 初期色（最初は全部赤）
+
+          button.addEventListener("click", () => {
+            // 検証用盤面の操作
+            const buttonIndexPressed = parseInt(button.dataset.index);
+            simulationBoardColors = applyMoveLogic(
+              simulationBoardColors,
+              buttonIndexPressed
+            );
+            updateAllSimButtonAppearances();
+          });
+        });
+        updateAllSimButtonAppearances(); // 初期描画
+      }
+
+      function updateSimButtonAppearance(buttonIndex) {
+        const button = simulationButtonElements[buttonIndex];
+        if (!button) return;
+        const colorIndex = simulationBoardColors[buttonIndex];
+        button.className = "sim-button"; // ClassListを使わずに基本クラスをリセット
+        button.classList.add(colorClasses[colorIndex]);
+      }
+      function updateAllSimButtonAppearances() {
+        for (let i = 0; i < simulationBoardColors.length; i++) {
+          updateSimButtonAppearance(i);
+        }
+      }
+
+      resetSimulationBoardButton.addEventListener("click", () => {
+        simulationBoardColors = [...initialBoardForSimulation]; // 計算開始時の盤面に戻す
+        updateAllSimButtonAppearances();
+      });
+
+      // --- 計算処理 ---
+      calculateButton.addEventListener("click", () => {
+        const startTime = performance.now();
+
+        const targetSameColorCount = parseInt(targetCountSelect.value);
+        initialBoardForSimulation = [...mainBoardColors]; // ★計算開始時の盤面を保存
+        simulationBoardColors = [...initialBoardForSimulation]; // ★検証盤面も初期化
+        updateAllSimButtonAppearances(); // ★検証盤面の表示を更新
+
+        const initialBoardForCalc = [...mainBoardColors];
+
+        resultDiv.textContent = "計算中...";
+
+        if (checkWinCondition(initialBoardForCalc, targetSameColorCount)) {
+          resultDiv.textContent = "🎉 初期状態で既にクリアしています！";
+
+          return;
+        }
+
+        const queue = [[initialBoardForCalc, []]];
+        const visited = new Set();
+        visited.add(initialBoardForCalc.toString());
+
+        let solutionFound = false;
+        let maxSteps = 150000;
+        let steps = 0;
+
+        while (queue.length > 0 && steps < maxSteps) {
+          steps++;
+          const [currentCalcBoard, currentPath] = queue.shift();
+          const lastButtonPressedId =
+            currentPath.length > 0 ? currentPath[currentPath.length - 1] : null;
+
+          for (let i = 0; i < 6; i++) {
+            const nextButtonIdToPress = buttonIds[i];
+            if (lastButtonPressedId === nextButtonIdToPress) {
+              continue;
+            }
+            const nextBoardState = applyMoveLogic(currentCalcBoard, i); // applyMoveLogic を使用
+            const nextPath = [...currentPath, nextButtonIdToPress];
+
+            if (checkWinCondition(nextBoardState, targetSameColorCount)) {
+              const endTime = performance.now();
+              resultDiv.textContent = `💡 手順: ${nextPath.join(" → ")}`;
+              solutionFound = true;
+              return;
+            }
+            const nextBoardStateString = nextBoardState.toString();
+            if (!visited.has(nextBoardStateString)) {
+              visited.add(nextBoardStateString);
+              queue.push([nextBoardState, nextPath]);
+            }
+          }
+        }
+
+        const endTime = performance.now();
+
+        if (!solutionFound) {
+          resultDiv.textContent =
+            "解が見つかりませんでした。(問題の前提と矛盾)";
+        }
+      });
+
+      // --- 初期化 ---
+      initializeMainBoard();
+      initializeSimulationBoard();
+    </script>
+  </body>
+</html>
